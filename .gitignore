@@ -20,4 +20,5 @@ data/
 screenshots/
 audio/
 models/
+benchmark-results/
 .DS_Store
