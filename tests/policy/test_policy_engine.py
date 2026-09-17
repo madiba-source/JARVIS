@@ -10,8 +10,10 @@ import pytest
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app.policy import AuthorizationLevel, DecisionState, PolicyEngineService, ToolRequest
+from app.policy.audit import AuditLogger
 from app.policy.confirmation import ConfirmationManager
 from app.policy.governor import DefaultResourceGovernor
+from app.policy.models import AuditEvent
 from app.policy.registry import ImmutableToolDefinition, PolicyRegistry, ToolDefinition
 from app.policy.tools import create_fake_tool_executor
 
@@ -244,3 +246,70 @@ def test_audit_redacts_sensitive_fields_and_logs_no_arguments() -> None:
     assert "do-not-log" not in serialized
     assert "secret_token_subsystem" not in serialized
     assert "REDACTED" in serialized
+
+
+def _audit_event(request_id: str, reason: str = "ok") -> AuditEvent:
+    return AuditEvent(
+        event_id=f"event-{request_id}",
+        request_id=request_id,
+        tool_id="test-tool",
+        requested_operation="read",
+        decision=DecisionState.ALLOW,
+        authorization_level=AuthorizationLevel.L0_READ_ONLY,
+        confirmation_state="NOT_USED",
+        resource_decision="APPROVED",
+        reason=reason,
+        source_subsystem="test",
+    )
+
+
+def test_audit_retention_evicts_oldest_events() -> None:
+    logger = AuditLogger(max_events=3)
+    for request_id in ("A", "B", "C", "D"):
+        logger.record(_audit_event(request_id))
+
+    assert [event.request_id for event in logger.get_events()] == ["B", "C", "D"]
+
+
+def test_audit_retention_configuration_is_finite_and_validated() -> None:
+    assert AuditLogger().max_events == AuditLogger.DEFAULT_MAX_EVENTS
+    with pytest.raises(ValueError):
+        AuditLogger(max_events=0)
+    with pytest.raises(ValueError):
+        AuditLogger(max_events=-1)
+    with pytest.raises(ValueError):
+        AuditLogger(max_events=AuditLogger.MAX_EVENTS + 1)
+    with pytest.raises(ValueError):
+        AuditLogger(max_events=True)
+
+
+def test_audit_read_isolation_and_sanitization_are_preserved() -> None:
+    logger = AuditLogger(max_events=3)
+    logger.record(_audit_event("secret", reason="password=do-not-store"))
+    events = logger.get_events()
+    events.clear()
+
+    retained = logger.get_events()
+    assert len(retained) == 1
+    assert retained[0].reason == "[REDACTED_SENSITIVE_CONTENT]"
+
+
+def test_audit_retention_is_safe_under_concurrent_access() -> None:
+    logger = AuditLogger(max_events=32)
+
+    def write(index: int) -> None:
+        logger.record(_audit_event(f"request-{index}"))
+
+    def read() -> int:
+        return len(logger.get_events())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(write, index) for index in range(100)]
+        reads = [pool.submit(read) for _ in range(20)]
+        for future in futures + reads:
+            future.result()
+
+    retained = logger.get_events()
+    assert len(retained) <= 32
+    logger.record(_audit_event("newest-after-concurrency"))
+    assert logger.get_events()[-1].request_id == "newest-after-concurrency"

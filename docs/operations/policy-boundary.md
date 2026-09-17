@@ -137,4 +137,9 @@ Argument validation failures expose only the fixed reason `Request argument vali
 
 Audit events contain policy metadata only. Arguments, metadata payloads, credentials, tokens, and secrets are not recorded. Sensitive substrings in operation, reason, and subsystem fields are redacted.
 
+The in-memory policy audit buffer is bounded to a finite configurable limit
+(default 4096, maximum 100000). When full, it evicts the oldest retained event
+deterministically. This buffer is operational observability, not a permanent
+audit archive; durable history belongs to the separate persistence layer.
+
 Execution permits are bearer capabilities authenticated with evaluator-held HMAC-SHA256 signatures. HMAC authenticates but does not encrypt permit contents. Argument snapshots remain owned by the permit and are the only payload source used by the execution lease. Phase 03 remains an application admission boundary, not an OS sandbox; runtime resource enforcement remains a later execution-runtime responsibility.
