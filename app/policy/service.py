@@ -75,6 +75,9 @@ class PolicyEngineService:
         return self.evaluator.evaluate(request)
 
     def issue_confirmation(self, request: ToolRequest) -> str:
+        # Confirmation preparation also owns its input rather than rereading
+        # the caller's nested containers across policy evaluation.
+        request = request.model_copy(deep=True)
         pending, permit = self.process_request(request.model_copy(update={"confirmation_token": None}))
         if pending.decision is not DecisionState.REQUIRE_CONFIRMATION or permit is not None:
             raise ValueError("confirmation can only be issued for a valid pending policy decision")
@@ -88,15 +91,10 @@ class PolicyEngineService:
         return self.confirmation_manager.generate_token(tool_id=definition.tool_id, request_id=request.request_id, operation=request.operation, arguments=arguments, authorization_level=definition.authorization_level, effective_budget=resource.effective_budget)
 
     def execute_with_permit(self, request: ToolRequest, permit: ExecutionPermit) -> dict[str, Any]:
-        with self.evaluator.acquire_execution_lease(permit, request):
-            definition = self.registry.get_immutable_definition(request.tool_name)
-            if definition is None:
-                raise PermissionError("registered tool no longer exists")
-            operation_model = definition.operation_models.get(request.operation)
-            if operation_model is None:
-                raise PermissionError("operation is no longer registered")
-            arguments = operation_model.model_validate(request.arguments).model_dump(mode="python")
-            return self.registry._invoke_for_gateway(request.tool_name, arguments)
+        with self.evaluator.acquire_execution_lease(permit, request) as lease:
+            return self.registry._invoke_for_gateway(
+                lease.permit.tool_id, lease.execution_arguments()
+            )
 
     def set_jarvis_active(self, active: bool) -> None:
         self.evaluator.set_jarvis_active(active)
