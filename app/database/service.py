@@ -6,20 +6,22 @@ from .config import DatabaseConfig
 from .connection import DatabaseConnectionManager
 from .health import DatabaseHealthChecker
 from .integrity import IntegrityChecker
-from .migrations import MigrationManager
+from .migrations import Migration, MigrationManager
 from .restore import DatabaseRestoreManager
 from .transactions import TransactionContext
 
 
 class DatabaseService:
     """Trusted internal persistence infrastructure; never expose transaction() to model tools."""
-    def __init__(self, config: DatabaseConfig | None = None) -> None:
+    def __init__(self, config: DatabaseConfig | None = None, extension_migrations: list[Migration] | None = None) -> None:
         self.config = config or DatabaseConfig()
         self.connection_manager = DatabaseConnectionManager(self.config)
         self.transaction_context = TransactionContext(self.connection_manager)
         self.migration_manager = MigrationManager(self.connection_manager)
         self.integrity_checker = IntegrityChecker(self.connection_manager)
         self._register_base_migration()
+        for version, description, func in extension_migrations or []:
+            self.migration_manager.register_migration(version, description, func)
         self.migration_manager.freeze()
         self.backup_manager = DatabaseBackupManager(self.connection_manager, self.migration_manager)
         self.restore_manager = DatabaseRestoreManager(self.connection_manager, self.backup_manager)

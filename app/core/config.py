@@ -5,6 +5,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.memory.config import MemoryConfig
+
 
 class Settings(BaseSettings):
     environment: str = "development"
@@ -13,9 +15,13 @@ class Settings(BaseSettings):
     ollama_host: str = "http://127.0.0.1:11434"
     log_level: str = "INFO"
     data_dir: Path = Path("./data")
+    memory_enabled: bool = True
+    memory_vector_enabled: bool = False
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="JARVIS_",
+        env_nested_delimiter="__",
         extra="ignore",
     )

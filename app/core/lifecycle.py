@@ -13,6 +13,7 @@ class JarvisCore:
         self.settings = settings or Settings()
         self.event_bus = event_bus or EventBus()
         self._started = False
+        self.memory_runtime = None
         self._logger = logging.getLogger("jarvis.core")
 
     @property
@@ -25,6 +26,13 @@ class JarvisCore:
         self._logger.info("JARVIS starting", extra={"environment": self.settings.environment})
         self.event_bus.publish({"event_type": "SYSTEM_START", "component": "core"})
         self._logger.info("JARVIS environment", extra={"ollama_host": self.settings.ollama_host})
+        if self.settings.memory_enabled:
+            from app.memory.runtime import MemoryRuntime
+            self.memory_runtime = MemoryRuntime(
+                self.settings.data_dir, self.settings.memory, self.event_bus,
+                vector_enabled=self.settings.memory_vector_enabled,
+            )
+            self._logger.info("JARVIS memory status", extra={"available": self.memory_runtime.available})
         self._started = True
         self._logger.info("JARVIS ready")
         self.event_bus.publish({"event_type": "SYSTEM_READY", "component": "core"})
@@ -34,4 +42,7 @@ class JarvisCore:
             return
         self._logger.info("JARVIS shutting down")
         self.event_bus.publish({"event_type": "SYSTEM_STOP", "component": "core"})
+        if self.memory_runtime is not None:
+            self.memory_runtime.close()
+            self.memory_runtime = None
         self._started = False

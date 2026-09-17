@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9.1", "pytest-asyncio>=1.4"]
+memory = ["qdrant-client>=1.15,<2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
