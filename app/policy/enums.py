@@ -1,0 +1,25 @@
+"""Policy enums."""
+
+from enum import Enum, IntEnum, unique
+
+
+@unique
+class AuthorizationLevel(IntEnum):
+    L0_READ_ONLY = 0
+    L1_REVERSIBLE = 1
+    L2_USER_DATA_MODIFICATION = 2
+    L3_DESTRUCTIVE = 3
+    L4_PRIVILEGED = 4
+    L5_EXTERNAL_SIDE_EFFECT = 5
+
+
+@unique
+class DecisionState(str, Enum):
+    ALLOW = "ALLOW"
+    DENY = "DENY"
+    REQUIRE_CONFIRMATION = "REQUIRE_CONFIRMATION"
+    INVALID_REQUEST = "INVALID_REQUEST"
+    RESOURCE_DENIED = "RESOURCE_DENIED"
+    SYSTEM_DISABLED = "SYSTEM_DISABLED"
+    UNKNOWN_TOOL = "UNKNOWN_TOOL"
+    POLICY_ERROR = "POLICY_ERROR"
