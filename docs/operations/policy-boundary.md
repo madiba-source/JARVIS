@@ -131,6 +131,10 @@ isolation is introduced. Phase 04 remains paused pending a fresh entry audit.
 
 Confirmation tokens bind the request ID, tool, operation, canonical arguments, authoritative authorization level, and effective resource constraints. Canonicalization rejects non-string object keys, non-finite numbers, and unsupported Python objects. Tokens are single-use, expire, and are stored in a bounded, pruned store.
 
+Argument validation failures expose only the fixed reason `Request argument validation failed`. Raw validator exceptions, rejected argument values, serialized arguments, and caller metadata are not copied into `PolicyDecision` or `AuditEvent`; redaction remains defense-in-depth rather than the primary privacy boundary.
+
 ## Audit
 
 Audit events contain policy metadata only. Arguments, metadata payloads, credentials, tokens, and secrets are not recorded. Sensitive substrings in operation, reason, and subsystem fields are redacted.
+
+Execution permits are bearer capabilities authenticated with evaluator-held HMAC-SHA256 signatures. HMAC authenticates but does not encrypt permit contents. Argument snapshots remain owned by the permit and are the only payload source used by the execution lease. Phase 03 remains an application admission boundary, not an OS sandbox; runtime resource enforcement remains a later execution-runtime responsibility.

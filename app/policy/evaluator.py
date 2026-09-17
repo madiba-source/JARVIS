@@ -24,6 +24,9 @@ from .registry import PolicyRegistry
 from .snapshot import OwnedArgumentsSnapshot
 
 
+ARGUMENT_VALIDATION_FAILURE_REASON = "Request argument validation failed"
+
+
 class ExecutionPermit(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -154,8 +157,8 @@ class PolicyEvaluator:
                 validated = definition.operation_models[request.operation].model_validate(owned_input)
                 snapshot = OwnedArgumentsSnapshot.capture(validated.model_dump(mode="python"))
                 normalized_arguments = snapshot.materialize()
-            except Exception as error:
-                return self._decision(request, DecisionState.INVALID_REQUEST, definition.authorization_level, definition.requires_confirmation, f"argument validation failed: {error}"), None
+            except Exception:
+                return self._decision(request, DecisionState.INVALID_REQUEST, definition.authorization_level, definition.requires_confirmation, ARGUMENT_VALIDATION_FAILURE_REASON), None
             resource = self.governor.check_budget(request.requested_resource_budget, definition.resource_requirements)
             if not resource.allowed:
                 return self._decision(request, DecisionState.RESOURCE_DENIED, definition.authorization_level, definition.requires_confirmation, resource.reason), None

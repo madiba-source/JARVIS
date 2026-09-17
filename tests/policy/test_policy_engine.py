@@ -51,6 +51,39 @@ def test_operation_and_argument_validation_is_closed_and_typed() -> None:
     assert service.process_request(request(tool_name="fake_create_note", operation="create", authorization_level=AuthorizationLevel.L1_REVERSIBLE, arguments={"title": "x"}))[0].decision is DecisionState.INVALID_REQUEST
 
 
+@pytest.mark.parametrize(
+    "arguments, marker",
+    [
+        ({"format": {"value": "JARVIS_VALIDATION_SECRET_9f71d2"}}, "JARVIS_VALIDATION_SECRET_9f71d2"),
+        ({"format": {"nested": ["JARVIS_NESTED_VALIDATION_SECRET_31c8a4"]}}, "JARVIS_NESTED_VALIDATION_SECRET_31c8a4"),
+        ({"format": 123, "marker": "JARVIS_EXCEPTION_TEXT_7b2e11"}, "JARVIS_EXCEPTION_TEXT_7b2e11"),
+    ],
+)
+def test_invalid_argument_details_never_reach_decision_or_audit(arguments: dict, marker: str) -> None:
+    service = PolicyEngineService()
+    decision, permit = service.process_request(request(arguments=arguments))
+
+    assert decision.decision is DecisionState.INVALID_REQUEST
+    assert permit is None
+    assert decision.reason == "Request argument validation failed"
+    assert marker not in decision.reason
+    audit_serialized = service.get_audit_events()[-1].model_dump_json()
+    assert marker not in audit_serialized
+
+
+def test_invalid_arguments_fail_closed_without_payload_metadata() -> None:
+    service = PolicyEngineService()
+    marker = "JARVIS_PAYLOAD_MARKER_0e2a9c"
+    decision, permit = service.process_request(
+        request(arguments={"format": {"payload": marker}}, metadata={"caller": marker})
+    )
+
+    assert decision.decision is DecisionState.INVALID_REQUEST
+    assert permit is None
+    assert marker not in decision.model_dump_json()
+    assert marker not in service.get_audit_events()[-1].model_dump_json()
+
+
 def test_unknown_tool_and_inactive_jarvis_fail_closed() -> None:
     service = PolicyEngineService()
     assert service.process_request(request(tool_name="unknown"))[0].decision is DecisionState.UNKNOWN_TOOL
