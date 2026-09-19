@@ -70,3 +70,17 @@ def test_default_core_runtime_uses_phase04_capabilities(tmp_path) -> None:
     assert "terminal" in core.agent_runtime.gateway.catalog.tool_ids
     assert "filesystem" in core.agent_runtime.gateway.catalog.tool_ids
     core.shutdown()
+
+
+def test_core_disable_and_enable_delegate_to_managed_services(tmp_path) -> None:
+    core = JarvisCore(Settings(data_dir=tmp_path, memory_enabled=False))
+    core.start()
+
+    core.disable()
+    assert core.agent_runtime is not None
+    assert core.agent_runtime.status().control_state == "disabled"
+    assert core.agent_runtime.gateway.evaluate is not None
+
+    core.enable()
+    assert core.agent_runtime.status().control_state == "enabled"
+    core.shutdown()

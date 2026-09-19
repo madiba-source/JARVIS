@@ -22,8 +22,8 @@ The following is the conservative phase status based on repository evidence and 
 - Phase 06: IMPLEMENTED
 - Phase 07: DEGRADED / OPTIONAL
 - Phase 08: IMPLEMENTED
-- Phase 09: IMPLEMENTED, CERTIFICATION TEST ADDED
-- Phase 10: BLOCKED: APPROVED HUD ARTIFACT MISSING
+- Phase 09: IMPLEMENTED, CERTIFICATION TESTED
+- Phase 10: BLOCKED: APPROVED HUD ARTIFACT NOT RECOVERED
 - Phase 11: IMPLEMENTED, VALIDATED, NOT CERTIFIED
 - Phase 12: INCOMPLETE
 
@@ -31,7 +31,8 @@ The following is the conservative phase status based on repository evidence and 
 
 The repository is not yet in final certified state because these Phase 12 requirements remain incomplete:
 
-- exact HUD reference/implementation is unavailable in the repository
+- exact HUD reference/implementation is unavailable after repository, Git
+	history, unreachable-object, workspace, and targeted home-directory search
 - complete model/license verification remains unavailable for packages reporting no license metadata
 - post-corrective-commit validation remains pending
 

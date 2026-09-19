@@ -23,6 +23,7 @@ from app.calendar.models import (
 )
 from app.calendar.store import CalendarStore
 from app.calendar.telemetry import emit_calendar_event
+from app.calendar.transfer import export_ics, import_ics
 
 
 class CalendarError(ValueError):
@@ -611,3 +612,13 @@ class CalendarService:
 
     def store(self) -> CalendarStore:
         return self._store
+
+    def export_ics(self) -> bytes:
+        return export_ics(self.list_events(limit=self._config.max_ics_events), self._config)
+
+    def import_ics(self, payload: bytes) -> list[CalendarEvent]:
+        imported = import_ics(payload, self._config)
+        for event in imported:
+            self.create_event(title=event.title, description=event.description,
+                              start=event.start, end=event.end, source="icalendar")
+        return imported

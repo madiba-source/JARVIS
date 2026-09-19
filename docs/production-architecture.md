@@ -62,6 +62,10 @@ The implemented security model remains the same regardless of cloud capability:
 - confirmation remains mandatory for sensitive operations
 - JARVIS disable remains authoritative across execution and routing
 
+`JarvisCore.disable()` delegates to the existing agent control, policy service,
+voice runtime, and calendar scheduler. It is idempotent at the managed-service
+boundaries and does not control ordinary desktop access.
+
 ## Offline behavior
 
 The codebase explicitly supports local-only mode and cloud-disabled operation. Offline behavior is not merely tolerated; it is the default operating mode.

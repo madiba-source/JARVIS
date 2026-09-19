@@ -14,7 +14,11 @@ The project is designed to run in a local, local-first Python environment. It is
 
 ## Disable and emergency behavior
 
-When JARVIS is disabled, execution is invalidated under the deterministic control model. The repo includes explicit disable logic in the agent runtime and policy gate. That behavior is intended to stop new work and release managed resources without interfering with the underlying Linux desktop environment.
+`JarvisCore.disable()` is the single application-level delegation for managed
+work. It invalidates agent execution and the Phase 04 policy state, stops voice
+and calendar scheduling, and leaves the underlying Linux desktop untouched.
+`JarvisCore.enable()` restores those managed services without constructing a
+second runtime.
 
 ## Offline behavior
 

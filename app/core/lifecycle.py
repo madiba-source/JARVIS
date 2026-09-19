@@ -61,6 +61,31 @@ class JarvisCore:
         self.event_bus.publish({"event_type": "SYSTEM_READY", "component": "core"})
         self._start_voice()
 
+    def disable(self) -> None:
+        """Stop JARVIS-managed work while leaving the desktop untouched."""
+        if self.agent_runtime is not None:
+            self.agent_runtime.disable()
+        if self._runtime_policy_service is not None:
+            try:
+                self._runtime_policy_service.set_jarvis_active(False)
+            except Exception:
+                self._logger.exception("JARVIS policy disable failed")
+        if self.voice_runtime is not None:
+            self.voice_runtime.disable()
+        if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
+            self.calendar_runtime.scheduler.stop()
+
+    def enable(self) -> None:
+        """Resume JARVIS-managed services without creating duplicate runtimes."""
+        if self._runtime_policy_service is not None:
+            self._runtime_policy_service.set_jarvis_active(True)
+        if self.agent_runtime is not None:
+            self.agent_runtime.enable()
+        if self.voice_runtime is not None:
+            self.voice_runtime.enable()
+        if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
+            self.calendar_runtime.scheduler.start()
+
     def _start_agent_runtime(self) -> None:
         router = self._agent_router
         try:

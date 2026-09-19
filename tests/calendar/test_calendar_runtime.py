@@ -29,5 +29,12 @@ def test_calendar_runtime_persists_queries_conflicts_and_reminders(tmp_path) -> 
 
     result = service.query(CalendarQuery(kind=QueryKind.DAY, date=start.date()))
     assert any(item["title"] == "Planning" for item in result["events"])
+    exported = service.export_ics()
+    assert b"BEGIN:VEVENT" in exported
     runtime.close()
+    second = CalendarRuntime(tmp_path / "imported", config, EventBus())
+    assert second.available and second.service is not None
+    imported = second.service.import_ics(exported.replace(b"Planning", b"Imported"))
+    assert imported[0].title == "Imported"
+    second.close()
     assert not runtime.available
