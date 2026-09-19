@@ -148,6 +148,11 @@ class CalendarService:
             updated = updated.model_copy(update={"end_date": end_date, "end": None})
         updated = updated.model_copy(update={"version": existing.version + 1})
         updated = CalendarEvent.model_validate(updated.model_copy(update={}).model_dump())
+        if check_conflicts and not updated.all_day:
+            conflicts = self._event_conflicts(updated)
+            if conflicts:
+                self._emit("CALENDAR_MUTATION_DENIED", success=False, error_type="conflict")
+                raise ConflictRejected(conflicts)
         self._store.update_event(updated, updated.model_dump_json())
         self._emit("CALENDAR_MUTATION_COMPLETED", count=1,
                    extra={"operation": "update_event"})
@@ -164,6 +169,11 @@ class CalendarService:
             updated = existing.model_copy(update={"start": to_start,
                                                   "end": to_start + duration,
                                                   "updated_at": self._now()})
+        if check_conflicts and not updated.all_day:
+            conflicts = self._event_conflicts(updated)
+            if conflicts:
+                self._emit("CALENDAR_MUTATION_DENIED", success=False, error_type="conflict")
+                raise ConflictRejected(conflicts)
         self._store.update_event(updated, updated.model_dump_json())
         self._emit("CALENDAR_MUTATION_COMPLETED", count=1,
                    extra={"operation": "move_event"})
@@ -178,6 +188,10 @@ class CalendarService:
         updated = existing.model_copy(update={
             "end": existing.start + timedelta(minutes=duration_minutes),
             "updated_at": self._now()})
+        conflicts = self._event_conflicts(updated)
+        if conflicts:
+            self._emit("CALENDAR_MUTATION_DENIED", success=False, error_type="conflict")
+            raise ConflictRejected(conflicts)
         self._store.update_event(updated, updated.model_dump_json())
         self._emit("CALENDAR_MUTATION_COMPLETED", count=1,
                    extra={"operation": "resize_event"})

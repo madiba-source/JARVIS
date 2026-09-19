@@ -117,14 +117,12 @@ class CalendarStore:
         with self._db.transaction() as conn:
             rows = conn.execute(
                 """SELECT * FROM calendar_events
-                   WHERE (all_day = 0 AND start >= ? AND start < ?)
-                      OR (all_day = 1 AND start_date >= ? AND start_date <= ?)
-                      OR (all_day = 1 AND end_date >= ? AND end_date <= ?)
+                         WHERE (all_day = 0 AND start < ? AND end > ?)
+                             OR (all_day = 1 AND start_date <= ? AND end_date >= ?)
                    ORDER BY COALESCE(start, start_date || ' 00:00:00')
                    LIMIT ?""",
-                (start.isoformat(), end.isoformat(),
-                 start.date().isoformat(), end.date().isoformat(),
-                 start.date().isoformat(), end.date().isoformat(),
+                     (end.isoformat(), start.isoformat(),
+                      end.date().isoformat(), start.date().isoformat(),
                  self._config.max_events_returned * 4)).fetchall()
         return [self._event_from_row(row) for row in rows]
 
