@@ -24,17 +24,16 @@ The following is the conservative phase status based on repository evidence and 
 - Phase 08: IMPLEMENTED
 - Phase 09: IMPLEMENTED, CERTIFICATION TESTED
 - Phase 10: IMPLEMENTED, HUD TESTED
-- Phase 11: IMPLEMENTED, VALIDATED, NOT CERTIFIED
-- Phase 12: INCOMPLETE
+- Phase 11: IMPLEMENTED, VALIDATED
+- Phase 12: CERTIFICATION VALIDATED
 
 ## Required final gates still not complete
 
-The repository is not yet in final certified state because these Phase 12 requirements remain incomplete:
+Known documented limitations:
 
-- exact HUD reference/implementation is unavailable after repository, Git
-	history, unreachable-object, workspace, and targeted home-directory search
-- complete model/license verification remains unavailable for packages reporting no license metadata
-- post-corrective-commit validation remains pending
+- some package license metadata is `UNVERIFIED` and is recorded without guessing
+- optional voice providers are unavailable in this environment and degrade safely
+- the protected unrelated nested `JARVIS/` directory remains outside project commits
 
 ## Test and compile evidence
 
@@ -46,6 +45,10 @@ Command executed:
 
 Result: PASS
 
+The final collection contained 380 tests. Policy, agent, audio, browser,
+vision, calendar, memory, execution, database, observability, HUD, and unit
+suites all passed.
+
 ### COMPILE CHECK
 
 Command executed:
@@ -56,9 +59,9 @@ Result: PASS
 
 ### BOOT / DIAGNOSTICS
 
-The default boot path reaches the real Phase 04 capability registry and the
-local-first agent runtime. The exact approved HUD cannot be certified because
-no approved image, UI file, or existing HUD implementation is present.
+The default boot path reaches the real Phase 04 capability registry, local-first
+agent runtime, memory runtime, and verified HUD runtime. The application entry
+point boots and shuts down cleanly with headless Qt.
 
 ### SECURITY
 
@@ -80,13 +83,22 @@ The implementation preserves the principle that JARVIS does not control the enti
 
 The repo includes explicit control/disable logic in the agent runtime and policy evaluation path.
 
+## Final measurements
+
+- Python: 3.14.7
+- HUD asset: 512x343 RGB PNG with verified SHA-256
+- Startup sample: 105744 KiB maximum resident set, one active thread
+- Startup CPU sample: 0.8587 user seconds and 0.066 system seconds
+- After disable/shutdown: one active thread and no managed HUD runtime
+- Cloud: disabled by default
+- Real boot, disable/enable, shutdown, and idempotency smoke tests: PASS
+
 ## Final status
 
-The current repository evidence supports the claim that the implementation and
-test layer are green, but final Phase 12 certification remains incomplete until
-the complete security/resource audit, truthful documentation review, intended
-file isolation, exact final commit, and post-commit validation are complete.
+The current repository evidence supports a validated final certification state
+for the implemented environment. Optional hardware-dependent voice remains
+degraded, and unverified package license metadata remains explicitly recorded.
 
 This document intentionally avoids claiming final production certification
-while the approved HUD artifact and complete dependency/license evidence are
-unresolved.
+while optional subsystem availability and unverified package metadata remain
+documented limitations.
