@@ -1,6 +1,7 @@
 """Minimal, explicit JARVIS lifecycle for foundation validation."""
 
 import logging
+from typing import Any
 
 from .config import Settings
 from .events import EventBus
@@ -9,10 +10,18 @@ from .events import EventBus
 class JarvisCore:
     """Owns only startup and shutdown state during Phase 01."""
 
-    def __init__(self, settings: Settings | None = None, event_bus: EventBus | None = None) -> None:
+    def __init__(self, settings: Settings | None = None, event_bus: EventBus | None = None,
+                 *, agent_config: Any = None, agent_router: Any = None,
+                 policy_service: Any = None) -> None:
         self.settings = settings or Settings()
         self.event_bus = event_bus or EventBus()
+        self._agent_config = agent_config
+        self._agent_router = agent_router
+        self._policy_service = policy_service
+        self._runtime_policy_service = None
         self._started = False
+        self.agent_runtime = None
+        self.agent_runtime_error: str | None = None
         self.memory_runtime = None
         self.voice_runtime = None
         self.calendar_runtime = None
@@ -46,10 +55,40 @@ class JarvisCore:
                 database=self._database, announce=self._voice_announce,
             )
             self._logger.info("JARVIS calendar status", extra={"available": self.calendar_runtime.available})
+        self._start_agent_runtime()
         self._started = True
         self._logger.info("JARVIS ready")
         self.event_bus.publish({"event_type": "SYSTEM_READY", "component": "core"})
         self._start_voice()
+
+    def _start_agent_runtime(self) -> None:
+        router = self._agent_router
+        try:
+            from app.agent.config import AgentConfig
+            from app.agent.coordinator import AgentRuntime
+            from app.agent.providers import OllamaProvider
+            from app.agent.router import ModelRouter
+            from app.execution.policy import Phase04PolicyService
+
+            config = self._agent_config or AgentConfig()
+            if router is None:
+                local = OllamaProvider(self.settings.ollama_host, self.settings.agent_model)
+                router = ModelRouter(config, local=local)
+            service = self._policy_service or Phase04PolicyService(self.settings.data_dir)
+            self._runtime_policy_service = service
+            self.agent_runtime = AgentRuntime(service, config=config, router=router)
+            self.agent_runtime_error = None
+        except Exception as error:
+            self.agent_runtime = None
+            self._runtime_policy_service = None
+            self.agent_runtime_error = type(error).__name__[:128] or "agent runtime unavailable"
+            close = getattr(router, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
+            self._logger.exception("JARVIS agent runtime startup failed")
 
     def _build_shared_database(self) -> None:
         from app.calendar.migration import CALENDAR_MIGRATIONS
@@ -84,10 +123,25 @@ class JarvisCore:
             self.voice_runtime = None
 
     def shutdown(self) -> None:
-        if not self._started:
+        if not self._started and self.agent_runtime is None and self.memory_runtime is None \
+                and self.calendar_runtime is None and self._database is None:
             return
         self._logger.info("JARVIS shutting down")
         self.event_bus.publish({"event_type": "SYSTEM_STOP", "component": "core"})
+        if self.agent_runtime is not None:
+            try:
+                self.agent_runtime.close()
+            except Exception:
+                self._logger.exception("JARVIS agent runtime shutdown failed")
+            self.agent_runtime = None
+        if self._runtime_policy_service is not None:
+            try:
+                close = getattr(self._runtime_policy_service, "close", None)
+                if callable(close):
+                    close()
+            except Exception:
+                self._logger.exception("JARVIS policy service shutdown failed")
+            self._runtime_policy_service = None
         if self.voice_runtime is not None:
             try:
                 self.voice_runtime.stop()

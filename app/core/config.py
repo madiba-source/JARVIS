@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
     ollama_host: str = "http://127.0.0.1:11434"
+    agent_model: str = "llama3.2"
     log_level: str = "INFO"
     data_dir: Path = Path("./data")
     memory_enabled: bool = True

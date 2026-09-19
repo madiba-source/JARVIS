@@ -9,12 +9,25 @@ attempting a call when unconfigured.
 
 from __future__ import annotations
 
+import json
+import re
+import threading
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from .model import ModelRequest, ModelResponse, ModelResponseState, failed_response, ok_response
 
 REQUEST_TIMEOUT_FLOOR = 0.1
+MAX_CLOUD_PAYLOAD_BYTES = 64 * 1024
+MAX_CLOUD_RESPONSE_BYTES = 64 * 1024
+MAX_CLOUD_CONCURRENT_REQUESTS = 1
+MAX_CLOUD_RETRIES = 2
+MAX_CLOUD_BACKOFF_SECONDS = 0.25
+_SENSITIVE_RE = re.compile(
+    r"\b(secret|password|token|api[_ -]?key|credential|private key|ssh|passwd|authorization)\b",
+    re.I,
+)
 _RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
@@ -27,10 +40,22 @@ class CloudProvider:
         self.endpoint = str(endpoint).strip()
         self._api_key = str(api_key)
         self.model = str(model).strip()
+        self._gate = threading.BoundedSemaphore(MAX_CLOUD_CONCURRENT_REQUESTS)
 
     @property
     def configured(self) -> bool:
         return bool(self.endpoint and self._api_key and self.model)
+
+    def validate_request(self, endpoint: str, payload: Any) -> None:
+        parsed = urlparse(endpoint)
+        if parsed.scheme not in {"https", "http"} or not parsed.netloc:
+            raise ValueError("cloud endpoint must be a valid http(s) URL")
+        encoded = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), allow_nan=False)
+        if len(encoded.encode("utf-8")) > MAX_CLOUD_PAYLOAD_BYTES:
+            raise ValueError("cloud payload exceeds bounded size")
+        content = payload.get("messages", [{}])[0].get("content", "") if isinstance(payload, dict) else ""
+        if isinstance(content, str) and _SENSITIVE_RE.search(content):
+            raise ValueError("cloud payload contains sensitive content")
 
     def available(self) -> bool:
         return self.configured
@@ -52,13 +77,30 @@ class CloudProvider:
             "max_tokens": int(request.max_output_tokens),
             "temperature": 0,
         }
-        headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
         try:
-            with httpx.Client(timeout=max(REQUEST_TIMEOUT_FLOOR, request.timeout)) as client:
-                response = client.post(self.endpoint, json=payload, headers=headers)
-        except Exception as error:
-            state = ModelResponseState.TIMEOUT if _is_timeout(error) else ModelResponseState.UNAVAILABLE
-            return failed_response(state, self.name, type(error).__name__)
+            self.validate_request(self.endpoint, payload)
+        except ValueError as error:
+            return failed_response(ModelResponseState.REJECTED, self.name, str(error))
+        headers = {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
+        if not self._gate.acquire(blocking=False):
+            return failed_response(ModelResponseState.UNAVAILABLE, self.name,
+                                   "cloud concurrency limit reached")
+        try:
+            response = None
+            for attempt in range(MAX_CLOUD_RETRIES + 1):
+                try:
+                    with httpx.Client(timeout=max(REQUEST_TIMEOUT_FLOOR, request.timeout)) as client:
+                        response = client.post(self.endpoint, json=payload, headers=headers)
+                except Exception as error:
+                    state = ModelResponseState.TIMEOUT if _is_timeout(error) else ModelResponseState.UNAVAILABLE
+                    return failed_response(state, self.name, type(error).__name__)
+                if response.status_code not in _RETRYABLE_STATUS or attempt >= MAX_CLOUD_RETRIES:
+                    break
+                time.sleep(min(MAX_CLOUD_BACKOFF_SECONDS, 0.05 * (2 ** attempt)))
+        finally:
+            self._gate.release()
+        if response is None:
+            return failed_response(ModelResponseState.UNAVAILABLE, self.name, "no provider response")
         duration = (time.monotonic() - started) * 1000
         if cancel is not None and getattr(cancel, "is_cancelled", False):
             return failed_response(ModelResponseState.CANCELLED, self.name, "cancelled during request")
@@ -68,6 +110,9 @@ class CloudProvider:
         if response.status_code >= 400:
             return failed_response(ModelResponseState.REJECTED, self.name,
                                    "provider rejected the request")
+        if len(response.content) > MAX_CLOUD_RESPONSE_BYTES:
+            return failed_response(ModelResponseState.OVERSIZED, self.name,
+                                   "cloud response exceeds bounded size")
         text = _extract_text(response)
         if not text:
             return failed_response(ModelResponseState.REJECTED, self.name, "empty provider response")

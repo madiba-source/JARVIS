@@ -6,15 +6,24 @@ a memory ceiling or an interruptible callback. Any claim that a limit is
 enforced rather than admitted is made explicitly where it is true.
 """
 
+from enum import StrEnum
+
 from pydantic import Field, StrictBool, model_validator
 
 from .models import Schema
+
+
+class PrivacyMode(StrEnum):
+    OFFLINE_ONLY = "offline_only"
+    LOCAL_PREFERRED = "local_preferred"
+    HYBRID = "hybrid"
 
 
 class AgentConfig(Schema):
     # --- global control -------------------------------------------------
     enabled: StrictBool = True
     cloud_enabled: StrictBool = False
+    privacy_mode: PrivacyMode = PrivacyMode.LOCAL_PREFERRED
     memory_persistence_enabled: StrictBool = True
 
     # --- plan shape -----------------------------------------------------

@@ -15,16 +15,18 @@ hardware, so it is enforced by a semaphore rather than assumed.
 
 from __future__ import annotations
 
+import re
 import threading
 from typing import Any
 
-from .config import AgentConfig
+from .config import AgentConfig, PrivacyMode
 from .errors import AgentConfigurationError
 from .model import ModelRequest, ModelResponse, ModelResponseState, failed_response
 from .providers import UnavailableProvider
 
 LOCAL_FALLBACK_STATES = frozenset({ModelResponseState.UNAVAILABLE})
 _FALLBACK_PROVIDER = "router"
+_SENSITIVE_RE = re.compile(r"\b(secret|password|token|api[_ -]?key|credential|private key|ssh|passwd|authorization)\b", re.I)
 
 
 class ModelRouter:
@@ -47,7 +49,11 @@ class ModelRouter:
 
     @property
     def cloud_enabled(self) -> bool:
-        return bool(self._config.cloud_enabled and self._cloud is not None)
+        if not self._config.cloud_enabled or self._cloud is None:
+            return False
+        if self._config.privacy_mode is PrivacyMode.OFFLINE_ONLY:
+            return False
+        return True
 
     def local_available(self) -> bool:
         try:
@@ -88,13 +94,22 @@ class ModelRouter:
         finally:
             self._gate.release()
 
+    def _cloud_allowed(self, request: ModelRequest) -> bool:
+        if not self.cloud_enabled:
+            return False
+        if self._config.privacy_mode is PrivacyMode.OFFLINE_ONLY:
+            return False
+        if self._config.privacy_mode is PrivacyMode.LOCAL_PREFERRED and _SENSITIVE_RE.search(request.prompt):
+            return False
+        return True
+
     def _generate_locked(self, request: ModelRequest, cancel: Any) -> ModelResponse:
         with self._lock:
             self.calls += 1
         response = self._attempt(self._local, request, cancel)
         if response.ok or response.state is ModelResponseState.CANCELLED:
             return response
-        if not self.cloud_enabled or response.state not in LOCAL_FALLBACK_STATES:
+        if not self._cloud_allowed(request) or response.state not in LOCAL_FALLBACK_STATES:
             return response
         if cancel is not None and getattr(cancel, "is_cancelled", False):
             return failed_response(ModelResponseState.CANCELLED, _FALLBACK_PROVIDER,
