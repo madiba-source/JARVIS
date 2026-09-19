@@ -22,6 +22,7 @@ class JarvisCore:
         self._started = False
         self.agent_runtime = None
         self.agent_runtime_error: str | None = None
+        self.hud_runtime = None
         self.memory_runtime = None
         self.voice_runtime = None
         self.calendar_runtime = None
@@ -56,6 +57,7 @@ class JarvisCore:
             )
             self._logger.info("JARVIS calendar status", extra={"available": self.calendar_runtime.available})
         self._start_agent_runtime()
+        self._start_hud()
         self._started = True
         self._logger.info("JARVIS ready")
         self.event_bus.publish({"event_type": "SYSTEM_READY", "component": "core"})
@@ -72,6 +74,8 @@ class JarvisCore:
                 self._logger.exception("JARVIS policy disable failed")
         if self.voice_runtime is not None:
             self.voice_runtime.disable()
+        if self.hud_runtime is not None:
+            self.hud_runtime.disable()
         if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
             self.calendar_runtime.scheduler.stop()
 
@@ -85,6 +89,20 @@ class JarvisCore:
             self.voice_runtime.enable()
         if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
             self.calendar_runtime.scheduler.start()
+        if self.hud_runtime is not None:
+            self.hud_runtime.enable()
+
+    def _start_hud(self) -> None:
+        if not self.settings.hud_enabled:
+            return
+        try:
+            from app.hud import HudRuntime
+            self.hud_runtime = HudRuntime()
+            if not self.hud_runtime.start():
+                self._logger.warning("JARVIS HUD unavailable", extra={"error": self.hud_runtime.error})
+        except Exception as error:
+            self.hud_runtime = None
+            self._logger.warning("JARVIS HUD startup failed", extra={"error": type(error).__name__})
 
     def _start_agent_runtime(self) -> None:
         router = self._agent_router
@@ -159,6 +177,12 @@ class JarvisCore:
             except Exception:
                 self._logger.exception("JARVIS agent runtime shutdown failed")
             self.agent_runtime = None
+        if self.hud_runtime is not None:
+            try:
+                self.hud_runtime.close()
+            except Exception:
+                self._logger.exception("JARVIS HUD shutdown failed")
+            self.hud_runtime = None
         if self._runtime_policy_service is not None:
             try:
                 close = getattr(self._runtime_policy_service, "close", None)

@@ -2,7 +2,7 @@
 
 ## Result
 
-`JARVIS_HUD_APPROVED_REFERENCE`: NOT RECOVERED
+`JARVIS_HUD_APPROVED_REFERENCE`: RECOVERED
 
 ## Sources searched
 
@@ -20,13 +20,14 @@
 `/home/master/Pictures/Screenshot_2026-09-16_05_01_38.png` was inspected. It
 is a WhatsApp desktop screenshot, not an approved JARVIS HUD reference.
 
-No PNG, JPEG, WebP, SVG, Qt Designer UI, QML file, HUD implementation, or
-textual reference identifying the approved design was found in the project or
-reachable/unreachable Git history.
+The exact approved PNG was subsequently supplied at
+`/home/master/Desktop/JARVIS/assets/hud/approved-ui.png` and verified as a
+512x343 RGB PNG with SHA-256
+`10a788cef3a00614a37a7cf88d073fd6799635e0acae9f2fca1a2bfc48515a65`.
+It is installed unchanged at `assets/hud/approved-ui.png`.
 
 ## Certification consequence
 
-The exact approved visual cannot be reconstructed from source code without
-inventing or redesigning the interface. No replacement HUD was created. The
-project may be certified for its implemented non-HUD subsystems, but final
-production certification remains blocked by this external artifact.
+The visual base is loaded unchanged by `app/hud/runtime.py`. The PySide6
+runtime adds only transparent, bounded motion layers and has no policy or tool
+authority.

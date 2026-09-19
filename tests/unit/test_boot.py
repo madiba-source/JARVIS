@@ -12,6 +12,15 @@ def test_settings_load_without_cloud_credentials() -> None:
     assert settings.ollama_host == "http://127.0.0.1:11434"
 
 
+def test_hud_asset_integrity() -> None:
+    import hashlib
+
+    from app.hud.runtime import ASSET_PATH, ASSET_SHA256, HudRuntime
+
+    assert HudRuntime.verify_asset(ASSET_PATH)
+    assert hashlib.sha256(ASSET_PATH.read_bytes()).hexdigest() == ASSET_SHA256
+
+
 def test_core_starts_and_shuts_down_cleanly() -> None:
     config = AgentConfig()
     router = ModelRouter(config, local=StaticProvider())
@@ -84,3 +93,14 @@ def test_core_disable_and_enable_delegate_to_managed_services(tmp_path) -> None:
     core.enable()
     assert core.agent_runtime.status().control_state == "enabled"
     core.shutdown()
+
+
+def test_core_hud_lifecycle_is_safe(tmp_path) -> None:
+    core = JarvisCore(Settings(data_dir=tmp_path, memory_enabled=False, hud_enabled=True))
+    core.start()
+    assert core.hud_runtime is not None
+    core.disable()
+    if core.hud_runtime.available:
+        assert not core.hud_runtime.enabled
+    core.shutdown()
+    assert core.hud_runtime is None
