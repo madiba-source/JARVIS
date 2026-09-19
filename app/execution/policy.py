@@ -13,6 +13,10 @@ from app.policy import AuthorizationLevel, DecisionState
 from app.policy.models import AuditEvent, ToolRequest
 from app.policy.registry import ToolDefinition
 from app.policy.service import PolicyEngineService
+from app.browser.config import BrowserConfig
+from app.browser.executor import BrowserExecutor
+from app.browser.provider import BrowserProvider
+from app.browser.schemas import BrowserInspectArgs, BrowserNavigateArgs, BrowserScreenshotArgs, BrowserTargetArgs, BrowserTypeArgs
 
 from .apps import ApplicationManager
 from .filesystem import FilesystemExecutor
@@ -22,7 +26,7 @@ from .terminal import TerminalExecutor
 
 
 class Phase04PolicyService(PolicyEngineService):
-    def __init__(self, workspace_root: Path | None = None, limits: ExecutionLimits | None = None, event_bus: EventBus | None = None) -> None:
+    def __init__(self, workspace_root: Path | None = None, limits: ExecutionLimits | None = None, event_bus: EventBus | None = None, browser_config: BrowserConfig | None = None, browser_provider: BrowserProvider | None = None) -> None:
         self.limits = limits or ExecutionLimits()
         self.workspace_root = (workspace_root or Path.cwd()).resolve()
         self._filesystem = FilesystemExecutor(self.workspace_root, self.limits)
@@ -30,6 +34,7 @@ class Phase04PolicyService(PolicyEngineService):
         self._applications = ApplicationManager(self.limits.max_directory_entries)
         self._execution_slots = threading.BoundedSemaphore(self.limits.max_concurrent_operations)
         self._operation_context = threading.local()
+        self._browser = BrowserExecutor(browser_provider or BrowserProvider(browser_config))
         self.event_bus = event_bus or EventBus()
         super().__init__()
 
@@ -42,6 +47,8 @@ class Phase04PolicyService(PolicyEngineService):
               ("applications", AuthorizationLevel.L0_READ_ONLY, ("discover",), {"discover": EmptyArgs}, {"discover": lambda arguments: self._applications.discover()}, False),
             ("application_control", AuthorizationLevel.L1_REVERSIBLE, ("launch", "close", "observe"), {"launch": LaunchAppArgs, "close": CloseAppArgs, "observe": ObserveAppArgs}, {"launch": self._applications._launch, "close": self._applications._close, "observe": self._applications._observe}, True),
             ("application_terminate", AuthorizationLevel.L3_DESTRUCTIVE, ("force_close",), {"force_close": ForceCloseAppArgs}, {"force_close": self._applications._force_close}, True),
+              ("browser_read", AuthorizationLevel.L0_READ_ONLY, ("navigate", "inspect", "screenshot"), {"navigate": BrowserNavigateArgs, "inspect": BrowserInspectArgs, "screenshot": BrowserScreenshotArgs}, {"navigate": lambda arguments: self._browser.read({**arguments, "operation": "navigate"}), "inspect": lambda arguments: self._browser.read({**arguments, "operation": "inspect"}), "screenshot": lambda arguments: self._browser.read({**arguments, "operation": "screenshot"})}, False),
+              ("browser_action", AuthorizationLevel.L1_REVERSIBLE, ("click", "type"), {"click": BrowserTargetArgs, "type": BrowserTypeArgs}, {"click": lambda arguments: self._browser.action({**arguments, "operation": "click"}), "type": lambda arguments: self._browser.action({**arguments, "operation": "type"})}, True),
         ]
         for tool_id, level, operations, schemas, executors, confirmation in definitions:
             self.registry.register_tool(ToolDefinition(tool_id=tool_id, name=tool_id, description=f"Controlled {tool_id} capability", authorization_level=level, requires_confirmation=confirmation, supported_operations=operations, operation_models=schemas, resource_requirements={"timeout_seconds": self.limits.command_timeout_seconds}, executor=self._executor(executors)))
@@ -78,6 +85,9 @@ class Phase04PolicyService(PolicyEngineService):
         finally:
             self._operation_context.operation = None
             self._execution_slots.release()
+
+    def close(self) -> None:
+        self._browser.provider.close()
 
     def _audit_execution(self, request: ToolRequest, result: ExecutionResult) -> None:
         self.audit_logger.record(AuditEvent(event_id=f"execution-{request.request_id}", request_id=request.request_id, tool_id=request.tool_name, requested_operation=request.operation, decision=DecisionState.ALLOW if result.success else DecisionState.POLICY_ERROR, authorization_level=None, confirmation_state="CONSUMED_OR_NOT_REQUIRED", resource_decision="ADMITTED", reason="execution completed" if result.success else "execution failed", source_subsystem="phase04.execution"))

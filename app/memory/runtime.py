@@ -16,12 +16,13 @@ from .store import MemoryStore
 
 class MemoryRuntime:
     def __init__(self, data_dir: Path, config: MemoryConfig, bus: EventBus,
-                 vector_enabled: bool = False) -> None:
+                 vector_enabled: bool = False,
+                 database: DatabaseService | None = None) -> None:
         self.service: MemoryService | None = None
         self.available = False
         self.vector_available = False
         try:
-            database = DatabaseService(
+            database = database or DatabaseService(
                 DatabaseConfig(db_path=str(data_dir / "jarvis.db"),
                                backup_directory=str(data_dir / "backups")),
                 extension_migrations=MEMORY_MIGRATIONS,

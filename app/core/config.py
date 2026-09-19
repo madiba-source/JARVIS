@@ -5,6 +5,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.audio.config import AudioConfig
+from app.calendar.config import CalendarConfig
 from app.memory.config import MemoryConfig
 
 
@@ -18,6 +20,8 @@ class Settings(BaseSettings):
     memory_enabled: bool = True
     memory_vector_enabled: bool = False
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    voice: AudioConfig = Field(default_factory=AudioConfig)
+    calendar: CalendarConfig = Field(default_factory=CalendarConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

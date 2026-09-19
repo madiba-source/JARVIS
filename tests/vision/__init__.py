@@ -1,0 +1,1 @@
+"""Phase 08 vision tests."""
