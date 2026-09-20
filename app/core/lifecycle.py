@@ -30,6 +30,7 @@ class JarvisCore:
         self.proactive_runtime = None
         self.multimodal_runtime = None
         self.interaction_runtime = None
+        self.health_runtime = None
         self._database = None
         self._logger = logging.getLogger("jarvis.core")
 
@@ -65,6 +66,7 @@ class JarvisCore:
         self._start_interaction_runtime()
         self._start_agent_runtime()
         self._start_autonomy_runtime()
+        self._start_health_runtime()
         self._start_hud()
         self._started = True
         self._logger.info("JARVIS ready")
@@ -92,6 +94,8 @@ class JarvisCore:
             self.multimodal_runtime.disable()
         if self.interaction_runtime is not None:
             self.interaction_runtime.disable()
+        if self.health_runtime is not None:
+            self.health_runtime.disable()
 
     def enable(self) -> None:
         """Resume JARVIS-managed services without creating duplicate runtimes."""
@@ -209,6 +213,23 @@ class JarvisCore:
             self.autonomy_runtime = None
             self._logger.exception("JARVIS autonomy runtime startup failed")
 
+    def _start_health_runtime(self) -> None:
+        try:
+            from app.health import HealthMonitor
+            from app.health.registry import ProbeResult
+            from app.health.models import FailureCategory, HealthLevel, HealthStatus
+            monitor = HealthMonitor(event_bus=self.event_bus)
+            monitor.register_component("core", HealthMonitor.healthy_probe)
+            monitor.register_component("agent_runtime", lambda: ProbeResult() if self.agent_runtime is not None else ProbeResult(HealthStatus.FAILED, HealthStatus.FAILED, HealthStatus.FAILED, FailureCategory.DEPENDENCY, "agent runtime unavailable"), dependencies=("core",))
+            monitor.register_component("multimodal", lambda: ProbeResult() if self.multimodal_runtime is not None else ProbeResult(HealthStatus.DEGRADED, summary="multimodal runtime unavailable"), dependencies=("core",))
+            monitor.register_component("voice", lambda: ProbeResult() if self.voice_runtime is not None and self.voice_runtime.started else ProbeResult(HealthStatus.DEGRADED, summary="voice runtime unavailable"), dependencies=("core",))
+            monitor.register_component("resources", HealthMonitor.resource_probe, level=HealthLevel.RESOURCE)
+            monitor.check()
+            self.health_runtime = monitor
+        except Exception:
+            self.health_runtime = None
+            self._logger.exception("JARVIS health monitor startup failed")
+
     def _voice_announce(self, message: str) -> None:
         voice = self.voice_runtime
         if voice is not None and getattr(voice, "_started", False):
@@ -288,6 +309,9 @@ class JarvisCore:
             except Exception:
                 self._logger.exception("JARVIS interaction shutdown failed")
             self.interaction_runtime = None
+        if self.health_runtime is not None:
+            self.health_runtime.disable()
+            self.health_runtime = None
         self.autonomy_runtime = None
         self._database = None
         self._started = False
