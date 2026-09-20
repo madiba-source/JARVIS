@@ -20,8 +20,9 @@ from app.calendar.store import CalendarStore
 from app.calendar.telemetry import emit_calendar_event
 from app.calendar.timetable import TimetablePlanner
 from app.calendar.workflows import CalendarStepRunner, WorkflowEngine
+from app.proactive.migration import PROACTIVE_MIGRATIONS
 
-_SHARED_MIGRATIONS = MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS
+_SHARED_MIGRATIONS = MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS + PROACTIVE_MIGRATIONS
 
 
 class CalendarRuntime:

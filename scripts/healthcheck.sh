@@ -23,6 +23,7 @@ from app.database.config import DatabaseConfig
 from app.database.service import DatabaseService
 from app.hud.runtime import ASSET_PATH, ASSET_SHA256
 from app.memory.migration import MEMORY_MIGRATIONS
+from app.proactive.migration import PROACTIVE_MIGRATIONS
 from app.version import CONFIG_SCHEMA_VERSION, RELEASE_NAME, __version__
 
 required = ("pydantic", "pydantic_settings", "sqlalchemy", "httpx", "structlog")
@@ -34,7 +35,7 @@ settings.data_dir.mkdir(parents=True, exist_ok=True)
 service = DatabaseService(DatabaseConfig(
     db_path=str(settings.data_dir / "jarvis.db"),
     backup_directory=str(settings.data_dir / "backups"),
-), extension_migrations=MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS)
+), extension_migrations=MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS + PROACTIVE_MIGRATIONS)
 service.initialize()
 health = service.health()
 asset_hash = hashlib.sha256(ASSET_PATH.read_bytes()).hexdigest()

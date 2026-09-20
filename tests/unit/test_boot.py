@@ -107,6 +107,25 @@ def test_core_hud_lifecycle_is_safe(tmp_path) -> None:
     assert core.hud_runtime is None
 
 
+def test_core_proactive_scheduler_follows_global_disable(tmp_path) -> None:
+    settings = Settings(data_dir=tmp_path, memory_enabled=False, hud_enabled=False,
+                        automation_enabled=True, calendar={"enabled": False})
+    core = JarvisCore(settings)
+
+    core.start()
+    assert core.proactive_runtime is not None
+    assert core.proactive_runtime.running
+
+    core.disable()
+    assert not core.proactive_runtime.running
+    assert not core.proactive_runtime.enabled
+
+    core.enable()
+    assert core.proactive_runtime.running
+    assert core.proactive_runtime.enabled
+    core.shutdown()
+
+
 def test_voice_startup_failure_isolated_from_core(tmp_path, monkeypatch) -> None:
     class FailingVoiceRuntime:
         def __init__(self, *args, **kwargs):

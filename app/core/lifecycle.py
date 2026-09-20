@@ -26,6 +26,7 @@ class JarvisCore:
         self.memory_runtime = None
         self.voice_runtime = None
         self.calendar_runtime = None
+        self.proactive_runtime = None
         self._database = None
         self._logger = logging.getLogger("jarvis.core")
 
@@ -39,7 +40,7 @@ class JarvisCore:
         self._logger.info("JARVIS starting", extra={"environment": self.settings.environment})
         self.event_bus.publish({"event_type": "SYSTEM_START", "component": "core"})
         self._logger.info("JARVIS environment", extra={"ollama_host": self.settings.ollama_host})
-        if self.settings.memory_enabled or self.settings.calendar.enabled:
+        if self.settings.memory_enabled or self.settings.calendar.enabled or self.settings.automation_enabled:
             self._build_shared_database()
         if self.settings.memory_enabled:
             from app.memory.runtime import MemoryRuntime
@@ -56,6 +57,7 @@ class JarvisCore:
                 database=self._database, announce=self._voice_announce,
             )
             self._logger.info("JARVIS calendar status", extra={"available": self.calendar_runtime.available})
+        self._start_proactive_runtime()
         self._start_agent_runtime()
         self._start_hud()
         self._started = True
@@ -78,6 +80,8 @@ class JarvisCore:
             self.hud_runtime.disable()
         if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
             self.calendar_runtime.scheduler.stop()
+        if self.proactive_runtime is not None:
+            self.proactive_runtime.disable()
 
     def enable(self) -> None:
         """Resume JARVIS-managed services without creating duplicate runtimes."""
@@ -89,6 +93,8 @@ class JarvisCore:
             self.voice_runtime.enable()
         if self.calendar_runtime is not None and self.calendar_runtime.scheduler is not None:
             self.calendar_runtime.scheduler.start()
+        if self.proactive_runtime is not None:
+            self.proactive_runtime.enable()
         if self.hud_runtime is not None:
             self.hud_runtime.enable()
 
@@ -138,12 +144,29 @@ class JarvisCore:
         from app.database.config import DatabaseConfig
         from app.database.service import DatabaseService
         from app.memory.migration import MEMORY_MIGRATIONS
+        from app.proactive.migration import PROACTIVE_MIGRATIONS
         if self._database is None:
             self._database = DatabaseService(
                 DatabaseConfig(db_path=str(self.settings.data_dir / "jarvis.db"),
                                backup_directory=str(self.settings.data_dir / "backups")),
-                extension_migrations=MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS,
+                extension_migrations=MEMORY_MIGRATIONS + CALENDAR_MIGRATIONS + PROACTIVE_MIGRATIONS,
             )
+
+    def _start_proactive_runtime(self) -> None:
+        if not self.settings.automation_enabled or self._database is None:
+            return
+        try:
+            from app.proactive.engine import ProactiveScheduler
+            self._database.initialize()
+            self.proactive_runtime = ProactiveScheduler(
+                self._database, poll_seconds=self.settings.automation_poll_seconds,
+                notifier=lambda message: self.event_bus.publish({"event_type": "PROACTIVE_NOTIFICATION", "message": message}),
+                event_bus=self.event_bus,
+            )
+            self.proactive_runtime.start()
+        except Exception:
+            self.proactive_runtime = None
+            self._logger.exception("JARVIS proactive runtime startup failed")
 
     def _voice_announce(self, message: str) -> None:
         voice = self.voice_runtime
@@ -206,5 +229,11 @@ class JarvisCore:
             except Exception:
                 self._logger.exception("JARVIS calendar shutdown failed")
             self.calendar_runtime = None
+        if self.proactive_runtime is not None:
+            try:
+                self.proactive_runtime.stop()
+            except Exception:
+                self._logger.exception("JARVIS proactive runtime shutdown failed")
+            self.proactive_runtime = None
         self._database = None
         self._started = False

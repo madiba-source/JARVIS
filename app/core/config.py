@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     voice: AudioConfig = Field(default_factory=AudioConfig)
     calendar: CalendarConfig = Field(default_factory=CalendarConfig)
+    automation_enabled: bool = True
+    automation_poll_seconds: float = Field(default=60.0, ge=1.0, le=3600.0)
 
     model_config = SettingsConfigDict(
         env_file=".env",
