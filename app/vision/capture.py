@@ -25,6 +25,9 @@ class ScreenCaptureProvider:
     def cancel(self) -> None:
         self._cancelled = True
 
+    def reset(self) -> None:
+        self._cancelled = False
+
     def capture_active_window(self) -> CapturedImage:
         if self._cancelled:
             raise RuntimeError("capture cancelled")

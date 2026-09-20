@@ -18,3 +18,9 @@ class VisionService:
     def cancel(self) -> None:
         self.capture.cancel()
         self.provider.cancel()
+
+    def reset(self) -> None:
+        for component in (self.capture, self.provider):
+            reset = getattr(component, "reset", None)
+            if callable(reset):
+                reset()

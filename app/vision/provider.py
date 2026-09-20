@@ -21,6 +21,10 @@ class VisionProvider:
         with self._lock:
             self._cancelled = True
 
+    def reset(self) -> None:
+        with self._lock:
+            self._cancelled = False
+
     def health(self) -> dict[str, Any]:
         return {"available": self._client is not None and self.config.enabled,
                 "model": self.config.model}

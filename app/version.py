@@ -1,5 +1,5 @@
 """JARVIS release metadata."""
 
-__version__ = "0.15.0"
-CONFIG_SCHEMA_VERSION = 2
-RELEASE_NAME = "Phase 15 bounded proactive workflow automation"
+__version__ = "0.16.0"
+CONFIG_SCHEMA_VERSION = 3
+RELEASE_NAME = "Phase 16 advanced multimodal intelligence"
