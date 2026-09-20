@@ -2,7 +2,8 @@
 set -u
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
+VENV_PYTHON="${VENV_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+[[ -x "$VENV_PYTHON" ]] || VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
 RUN_DIR="$PROJECT_ROOT/data/run"
 PID_FILE="$RUN_DIR/jarvis.pid"
 DISABLED_FILE="$RUN_DIR/disabled"

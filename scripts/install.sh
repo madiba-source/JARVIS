@@ -12,7 +12,7 @@ if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,
     printf '%s\n' 'BLOCKED: Python 3.14 or newer is required.' >&2
     exit 1
 fi
-for command_name in git curl; do
+for command_name in git; do
     command -v "$command_name" >/dev/null 2>&1 || {
         printf 'BLOCKED: required command missing: %s\n' "$command_name" >&2
         exit 1
@@ -20,11 +20,13 @@ for command_name in git curl; do
 done
 
 cd "$PROJECT_ROOT"
-if [[ ! -d venv ]]; then
-    "$PYTHON_BIN" -m venv venv
+"$PROJECT_ROOT/scripts/preflight.sh"
+VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv}"
+if [[ ! -d "$VENV_DIR" ]]; then
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
-venv/bin/python -m pip install --upgrade pip
-venv/bin/python -m pip install -e '.[dev]'
-mkdir -p data/backups data/run logs
+"$VENV_DIR/bin/python" -m pip install --upgrade pip
+"$VENV_DIR/bin/python" -m pip install -e '.[dev]'
+mkdir -p data/backups data/run logs config cache models backups
 scripts/healthcheck.sh
 printf '%s\n' 'Installation complete.'

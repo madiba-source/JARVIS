@@ -1,0 +1,15 @@
+[Unit]
+Description=JARVIS user service
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/JARVIS
+ExecStart=%h/JARVIS/.venv/bin/python -m app.main --foreground
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

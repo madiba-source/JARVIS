@@ -2,7 +2,8 @@
 set -u
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
+VENV_PYTHON="${VENV_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+[[ -x "$VENV_PYTHON" ]] || VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
 EXPECTED_HUD_SHA256="10a788cef3a00614a37a7cf88d073fd6799635e0acae9f2fca1a2bfc48515a65"
 
 if [[ ! -x "$VENV_PYTHON" ]]; then
