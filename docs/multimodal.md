@@ -1,6 +1,6 @@
 # Multimodal Intelligence
 
-Phase 16 release version: `0.16.0`.
+Current release version: `0.22.0`.
 
 ## Context
 

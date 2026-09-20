@@ -12,7 +12,7 @@ LOG_FILE="$PROJECT_ROOT/logs/jarvis.log"
 mkdir -p "$RUN_DIR" "$PROJECT_ROOT/logs"
 
 usage() {
-    printf '%s\n' "Usage: $0 {start|stop|restart|disable|enable|status|health}"
+    printf '%s\n' "Usage: $0 {start|stop|restart|disable|enable|status|health|doctor|logs|service-install|service-uninstall}"
 }
 
 pid_is_running() {
@@ -89,5 +89,31 @@ case "${1:-}" in
     enable) rm -f "$DISABLED_FILE" && printf '%s\n' 'JARVIS enabled.' ;;
     status) status ;;
     health) require_python; exec "$PROJECT_ROOT/scripts/healthcheck.sh" ;;
+    doctor) exec "$PROJECT_ROOT/scripts/diagnostics.sh" ;;
+    logs) [[ -f "$LOG_FILE" ]] && exec tail -n "${JARVIS_LOG_LINES:-100}" "$LOG_FILE" || { printf '%s\n' 'JARVIS log is empty.'; exit 0; } ;;
+    service-install)
+        require_python
+        service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+        service_file="$service_dir/jarvis.service"
+        mkdir -p "$service_dir"
+        sed -e "s|@VENV_PYTHON@|$VENV_PYTHON|g" -e "s|%h/JARVIS|$PROJECT_ROOT|g" \
+            "$PROJECT_ROOT/packaging/jarvis.service.in" > "$service_file"
+        if command -v systemctl >/dev/null 2>&1; then
+            if ! systemctl --user daemon-reload || ! systemctl --user enable jarvis.service; then
+                printf '%s\n' 'BLOCKED: user systemd is unavailable; service file was rendered but not enabled.' >&2
+                exit 1
+            fi
+        fi
+        printf 'Installed user service: %s\n' "$service_file"
+        ;;
+    service-uninstall)
+        service_file="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/jarvis.service"
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl --user disable --now jarvis.service 2>/dev/null || true
+            systemctl --user daemon-reload
+        fi
+        rm -f "$service_file"
+        printf 'Removed user service: %s\n' "$service_file"
+        ;;
     *) usage; exit 2 ;;
 esac

@@ -95,10 +95,11 @@ The repo includes explicit control/disable logic in the agent runtime and policy
 
 ## Final status
 
-The current repository evidence supports a validated final certification state
-for the implemented environment. Optional hardware-dependent voice remains
-degraded, and unverified package license metadata remains explicitly recorded.
+The current repository evidence supports the verified `0.22.0` production
+baseline: the application was installed in a separate `~/JARVIS` tree, the
+user service was enabled and exercised through start, health, restart, and
+stop, and a final database backup was created and checksum-verified.
 
-This document intentionally avoids claiming final production certification
-while optional subsystem availability and unverified package metadata remain
-documented limitations.
+Optional hardware-dependent voice remains degraded, and unverified package
+license metadata remains explicitly recorded. Those are documented capability
+limitations, not silently treated as available features.

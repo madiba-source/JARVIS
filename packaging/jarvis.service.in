@@ -5,7 +5,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=%h/JARVIS
-ExecStart=%h/JARVIS/.venv/bin/python -m app.main --foreground
+ExecStart=@VENV_PYTHON@ -m app.main --foreground
 ExecStop=/bin/kill -TERM $MAINPID
 Restart=on-failure
 RestartSec=5

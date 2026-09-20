@@ -10,9 +10,9 @@ Run `scripts/preflight.sh`, then `scripts/install.sh`. The installer checks Linu
 
 ## Control
 
-Use `scripts/jarvisctl.sh start|stop|restart|status|health|disable|enable`. Disable stops Jarvis-managed work and leaves the desktop untouched. `health` invokes the existing runtime health architecture through the control interface.
+Use `scripts/jarvisctl.sh start|stop|restart|status|health|doctor|logs|disable|enable`. Disable stops Jarvis-managed work and leaves the desktop untouched. `health` invokes the existing runtime health architecture; `doctor` runs read-only host and dependency diagnostics; `logs` prints the recent runtime log.
 
-The optional user service template is `packaging/jarvis.service.in`. Copy it to `~/.config/systemd/user/jarvis.service`, adjust `WorkingDirectory` if needed, then use `systemctl --user daemon-reload`, `enable --now jarvis`, `status jarvis`, and `disable --now jarvis`. It is user-level and does not require root.
+Install the user service for the current checkout with `scripts/jarvisctl.sh service-install`. This renders `packaging/jarvis.service.in` using the active project root and Python environment, then enables the user unit without root. Start it with `systemctl --user start jarvis`, inspect it with `systemctl --user status jarvis`, and remove it with `scripts/jarvisctl.sh service-uninstall`.
 
 ## Configuration and data
 
