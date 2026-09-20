@@ -20,8 +20,9 @@ from app.browser.schemas import BrowserInspectArgs, BrowserNavigateArgs, Browser
 
 from .apps import ApplicationManager
 from .filesystem import FilesystemExecutor
+from .kali import KaliToolRegistry
 from .models import ExecutionCode, ExecutionLimits, ExecutionResult
-from .schemas import CloseAppArgs, CopyMoveArgs, CreateFileArgs, EmptyArgs, ForceCloseAppArgs, LaunchAppArgs, ListDirectoryArgs, ObserveAppArgs, PathArgs, ReadFileArgs, SearchFilesArgs, TerminalArgs, WriteFileArgs
+from .schemas import CloseAppArgs, CopyMoveArgs, CreateFileArgs, EmptyArgs, ForceCloseAppArgs, LaunchAppArgs, ListDirectoryArgs, ObserveAppArgs, PathArgs, ReadFileArgs, RefreshArgs, SearchFilesArgs, TerminalArgs, WriteFileArgs
 from .terminal import TerminalExecutor
 
 
@@ -32,6 +33,7 @@ class Phase04PolicyService(PolicyEngineService):
         self._filesystem = FilesystemExecutor(self.workspace_root, self.limits)
         self._terminal = TerminalExecutor(self.workspace_root, self.limits)
         self._applications = ApplicationManager(self.limits.max_directory_entries)
+        self._kali = KaliToolRegistry(max_tools=self.limits.max_directory_entries)
         self._execution_slots = threading.BoundedSemaphore(self.limits.max_concurrent_operations)
         self._operation_context = threading.local()
         self._browser = BrowserExecutor(browser_provider or BrowserProvider(browser_config))
@@ -44,7 +46,8 @@ class Phase04PolicyService(PolicyEngineService):
               ("filesystem_write", AuthorizationLevel.L2_USER_DATA_MODIFICATION, ("create_file", "write_file", "copy_file", "move_file"), {"create_file": CreateFileArgs, "write_file": WriteFileArgs, "copy_file": CopyMoveArgs, "move_file": CopyMoveArgs}, {"create_file": lambda arguments: self._filesystem.write_file({**arguments, "overwrite": False}), "write_file": self._filesystem.write_file, "copy_file": self._filesystem.copy_file, "move_file": self._filesystem.move_file}, True),
               ("filesystem_delete", AuthorizationLevel.L3_DESTRUCTIVE, ("delete_file",), {"delete_file": PathArgs}, {"delete_file": self._filesystem.delete_file}, True),
               ("terminal", AuthorizationLevel.L0_READ_ONLY, ("execute",), {"execute": TerminalArgs}, {"execute": self._terminal.execute}, False),
-              ("applications", AuthorizationLevel.L0_READ_ONLY, ("discover",), {"discover": EmptyArgs}, {"discover": lambda arguments: self._applications.discover()}, False),
+              ("applications", AuthorizationLevel.L0_READ_ONLY, ("discover", "refresh"), {"discover": EmptyArgs, "refresh": RefreshArgs}, {"discover": lambda arguments: self._applications.discover(), "refresh": lambda arguments: self._applications.refresh()}, False),
+              ("kali_capabilities", AuthorizationLevel.L0_READ_ONLY, ("discover", "refresh"), {"discover": EmptyArgs, "refresh": RefreshArgs}, {"discover": lambda arguments: self._kali.discover(), "refresh": lambda arguments: self._kali.discover(refresh=True)}, False),
             ("application_control", AuthorizationLevel.L1_REVERSIBLE, ("launch", "close", "observe"), {"launch": LaunchAppArgs, "close": CloseAppArgs, "observe": ObserveAppArgs}, {"launch": self._applications._launch, "close": self._applications._close, "observe": self._applications._observe}, True),
             ("application_terminate", AuthorizationLevel.L3_DESTRUCTIVE, ("force_close",), {"force_close": ForceCloseAppArgs}, {"force_close": self._applications._force_close}, True),
               ("browser_read", AuthorizationLevel.L0_READ_ONLY, ("navigate", "inspect", "screenshot"), {"navigate": BrowserNavigateArgs, "inspect": BrowserInspectArgs, "screenshot": BrowserScreenshotArgs}, {"navigate": lambda arguments: self._browser.read({**arguments, "operation": "navigate"}), "inspect": lambda arguments: self._browser.read({**arguments, "operation": "inspect"}), "screenshot": lambda arguments: self._browser.read({**arguments, "operation": "screenshot"})}, False),

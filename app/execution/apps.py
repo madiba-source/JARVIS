@@ -7,6 +7,7 @@ import shlex
 import shutil
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,11 @@ class ApplicationRecord:
     argv: tuple[str, ...]
     categories: tuple[str, ...] = ()
     terminal: bool = False
+    aliases: tuple[str, ...] = ()
+    capabilities: tuple[str, ...] = ("launch", "observe", "close")
+    available: bool = True
+    risk_level: int = 1
+    requires_privileges: bool = False
 
 
 class ApplicationManager:
@@ -29,8 +35,19 @@ class ApplicationManager:
         self._processes: dict[str, subprocess.Popen[bytes]] = {}
         self._lock = threading.RLock()
         self._max_applications = max_applications
+        self._cached_records: dict[str, ApplicationRecord] | None = None
+        self._cache_time = 0.0
+        self._cache_ttl_seconds = 60.0
 
     def discover(self) -> dict:
+        records = self._records()
+        return ExecutionResult(code=ExecutionCode.SUCCESS, message="applications discovered", data={"applications": [record.__dict__ for record in records.values()]}).model_dump()
+
+    def refresh(self) -> dict:
+        records = self._records(refresh=True)
+        return ExecutionResult(code=ExecutionCode.SUCCESS, message="application registry refreshed", data={"applications": [record.__dict__ for record in records.values()], "refreshed": True}).model_dump()
+
+    def _scan(self) -> dict[str, ApplicationRecord]:
         records: dict[str, ApplicationRecord] = {}
         directories = [Path.home() / ".local/share/applications", Path("/usr/share/applications")]
         for directory in directories:
@@ -40,7 +57,7 @@ class ApplicationManager:
                 record = self._parse(desktop_file)
                 if record and record.application_id not in records: records[record.application_id] = record
                 if len(records) >= self._max_applications: break
-        return ExecutionResult(code=ExecutionCode.SUCCESS, message="applications discovered", data={"applications": [record.__dict__ for record in records.values()]}).model_dump()
+        return records
 
     def _parse(self, path: Path) -> ApplicationRecord | None:
         try: lines = path.read_text(encoding="utf-8", errors="strict").splitlines()
@@ -59,7 +76,9 @@ class ApplicationManager:
         executable = shutil.which(argv[0])
         if not executable or not os.access(executable, os.X_OK): return None
         application_id = path.name.removesuffix(".desktop")
-        return ApplicationRecord(application_id=application_id, display_name=values.get("Name", application_id), executable=str(Path(executable).resolve()), desktop_file=str(path.resolve()), argv=(str(Path(executable).resolve()), *argv[1:]), categories=tuple(filter(None, values.get("Categories", "").split(";"))), terminal=values.get("Terminal", "false").lower() == "true")
+        categories = tuple(filter(None, values.get("Categories", "").split(";")))
+        aliases = tuple(filter(None, values.get("Keywords", "").split(";")))
+        return ApplicationRecord(application_id=application_id, display_name=values.get("Name", application_id), executable=str(Path(executable).resolve()), desktop_file=str(path.resolve()), argv=(str(Path(executable).resolve()), *argv[1:]), categories=categories, terminal=values.get("Terminal", "false").lower() == "true", aliases=aliases)
 
     def _launch(self, arguments: dict) -> dict:
         with self._lock:
@@ -98,14 +117,10 @@ class ApplicationManager:
             running = process is not None and process.poll() is None
             return ExecutionResult(code=ExecutionCode.SUCCESS, message="application observed", data={"application_id": arguments["application_id"], "running": running, "pid": process.pid if process else None}).model_dump()
 
-    def _records(self) -> dict[str, ApplicationRecord]:
-        result: dict[str, ApplicationRecord] = {}
-        directories = [Path.home() / ".local/share/applications", Path("/usr/share/applications")]
-        for directory in directories:
-            if len(result) >= self._max_applications: break
-            if directory.is_dir():
-                for desktop_file in sorted(directory.glob("*.desktop")):
-                    record = self._parse(desktop_file)
-                    if record: result.setdefault(record.application_id, record)
-                    if len(result) >= self._max_applications: break
-        return result
+    def _records(self, refresh: bool = False) -> dict[str, ApplicationRecord]:
+        if self._cached_records is not None and not refresh and time.monotonic() - self._cache_time < self._cache_ttl_seconds:
+            return dict(self._cached_records)
+        result = self._scan()
+        self._cached_records = result
+        self._cache_time = time.monotonic()
+        return dict(result)

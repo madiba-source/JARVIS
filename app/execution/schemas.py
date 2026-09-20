@@ -7,6 +7,10 @@ class EmptyArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class RefreshArgs(EmptyArgs):
+    pass
+
+
 class PathArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
     path: StrictStr = Field(min_length=1, max_length=4096)

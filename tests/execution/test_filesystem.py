@@ -42,6 +42,18 @@ def test_path_traversal_and_unknown_capability_denied(tmp_path: Path) -> None:
     assert service.execute(unknown).code.value == "denied"
 
 
+def test_discovery_capabilities_are_typed_read_only_and_disable_aware(tmp_path: Path) -> None:
+    service = Phase04PolicyService(tmp_path)
+    discovery = request("kali_capabilities", "discover", {}, AuthorizationLevel.L0_READ_ONLY, "kali")
+    result = service.execute(discovery)
+    assert result.success
+    assert isinstance(result.data["capabilities"], list)
+    assert service.execute(discovery.model_copy(update={"arguments": {"unexpected": True}})).code.value == "denied"
+
+    service.set_jarvis_active(False)
+    assert service.execute(discovery).code.value == "denied"
+
+
 def test_emergency_stop_blocks_new_execution_without_touching_workspace(tmp_path: Path) -> None:
     service = Phase04PolicyService(tmp_path)
     service.set_jarvis_active(False)
