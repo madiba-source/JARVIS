@@ -28,6 +28,7 @@ class JarvisCore:
         self.calendar_runtime = None
         self.proactive_runtime = None
         self.multimodal_runtime = None
+        self.interaction_runtime = None
         self._database = None
         self._logger = logging.getLogger("jarvis.core")
 
@@ -60,6 +61,7 @@ class JarvisCore:
             self._logger.info("JARVIS calendar status", extra={"available": self.calendar_runtime.available})
         self._start_proactive_runtime()
         self._start_multimodal_runtime()
+        self._start_interaction_runtime()
         self._start_agent_runtime()
         self._start_hud()
         self._started = True
@@ -86,6 +88,8 @@ class JarvisCore:
             self.proactive_runtime.disable()
         if self.multimodal_runtime is not None:
             self.multimodal_runtime.disable()
+        if self.interaction_runtime is not None:
+            self.interaction_runtime.disable()
 
     def enable(self) -> None:
         """Resume JARVIS-managed services without creating duplicate runtimes."""
@@ -101,6 +105,8 @@ class JarvisCore:
             self.proactive_runtime.enable()
         if self.multimodal_runtime is not None:
             self.multimodal_runtime.enable()
+        if self.interaction_runtime is not None:
+            self.interaction_runtime.enable()
         if self.hud_runtime is not None:
             self.hud_runtime.enable()
 
@@ -182,6 +188,14 @@ class JarvisCore:
             self.multimodal_runtime = None
             self._logger.exception("JARVIS multimodal runtime startup failed")
 
+    def _start_interaction_runtime(self) -> None:
+        try:
+            from app.interaction.runtime import InteractionRuntime
+            self.interaction_runtime = InteractionRuntime()
+        except Exception:
+            self.interaction_runtime = None
+            self._logger.exception("JARVIS interaction runtime startup failed")
+
     def _voice_announce(self, message: str) -> None:
         voice = self.voice_runtime
         if voice is not None and getattr(voice, "_started", False):
@@ -255,5 +269,11 @@ class JarvisCore:
             except Exception:
                 self._logger.exception("JARVIS multimodal runtime shutdown failed")
             self.multimodal_runtime = None
+        if self.interaction_runtime is not None:
+            try:
+                self.interaction_runtime.disable()
+            except Exception:
+                self._logger.exception("JARVIS interaction shutdown failed")
+            self.interaction_runtime = None
         self._database = None
         self._started = False
