@@ -24,3 +24,15 @@ def test_external_observation_refresh_changes_identity() -> None:
 
     assert refreshed.observation_id != original.observation_id
     assert refreshed.content_hash
+
+
+@pytest.mark.parametrize("value", [
+    "http://localhost/admin",
+    "http://127.0.0.1:8080",
+    "http://10.0.0.1/",
+    "http://169.254.169.254/latest/meta-data",
+    "http://user:password@example.com/",
+])
+def test_private_hosts_and_embedded_credentials_are_rejected(value: str) -> None:
+    with pytest.raises(ValueError):
+        validate_url(value)
