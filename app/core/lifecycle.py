@@ -31,6 +31,7 @@ class JarvisCore:
         self.multimodal_runtime = None
         self.interaction_runtime = None
         self.health_runtime = None
+        self.performance_runtime = None
         self._database = None
         self._logger = logging.getLogger("jarvis.core")
 
@@ -67,6 +68,7 @@ class JarvisCore:
         self._start_agent_runtime()
         self._start_autonomy_runtime()
         self._start_health_runtime()
+        self._start_performance_runtime()
         self._start_hud()
         self._started = True
         self._logger.info("JARVIS ready")
@@ -96,6 +98,8 @@ class JarvisCore:
             self.interaction_runtime.disable()
         if self.health_runtime is not None:
             self.health_runtime.disable()
+        if self.performance_runtime is not None:
+            self.performance_runtime.disable()
 
     def enable(self) -> None:
         """Resume JARVIS-managed services without creating duplicate runtimes."""
@@ -230,6 +234,14 @@ class JarvisCore:
             self.health_runtime = None
             self._logger.exception("JARVIS health monitor startup failed")
 
+    def _start_performance_runtime(self) -> None:
+        try:
+            from app.observability import PerformanceRecorder, TelemetryMode
+            self.performance_runtime = PerformanceRecorder(mode=TelemetryMode.LOCAL)
+        except Exception:
+            self.performance_runtime = None
+            self._logger.exception("JARVIS performance recorder startup failed")
+
     def _voice_announce(self, message: str) -> None:
         voice = self.voice_runtime
         if voice is not None and getattr(voice, "_started", False):
@@ -312,6 +324,9 @@ class JarvisCore:
         if self.health_runtime is not None:
             self.health_runtime.disable()
             self.health_runtime = None
+        if self.performance_runtime is not None:
+            self.performance_runtime.disable()
+            self.performance_runtime = None
         self.autonomy_runtime = None
         self._database = None
         self._started = False

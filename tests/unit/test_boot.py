@@ -89,6 +89,7 @@ def test_core_disable_and_enable_delegate_to_managed_services(tmp_path) -> None:
     core.disable()
     assert core.agent_runtime is not None
     assert core.autonomy_runtime is not None
+    assert core.performance_runtime is not None
     assert core.agent_runtime.status().control_state == "disabled"
     assert core.agent_runtime.gateway.evaluate is not None
 
