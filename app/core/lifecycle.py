@@ -156,14 +156,14 @@ class JarvisCore:
     def _start_voice(self) -> None:
         if not self.settings.voice.enabled:
             return
-        from app.audio.runtime import VoiceRuntime
-        self.voice_runtime = VoiceRuntime(self.settings.voice, self.event_bus)
         try:
+            from app.audio.runtime import VoiceRuntime
+            self.voice_runtime = VoiceRuntime(self.settings.voice, self.event_bus)
             self.voice_runtime.set_policy_active(True)
             self.voice_runtime.start()
         except Exception:
-            self._logger.exception("JARVIS voice startup failed")
             self.voice_runtime = None
+            self._logger.exception("JARVIS voice startup failed")
 
     def shutdown(self) -> None:
         if not self._started and self.agent_runtime is None and self.memory_runtime is None \

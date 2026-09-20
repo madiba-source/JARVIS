@@ -1,5 +1,6 @@
 from app.core import JarvisCore
 from app.core.config import Settings
+from app.audio.config import AudioConfig
 from app.agent.config import AgentConfig
 from app.agent.providers import StaticProvider
 from app.agent.router import ModelRouter
@@ -104,3 +105,19 @@ def test_core_hud_lifecycle_is_safe(tmp_path) -> None:
         assert not core.hud_runtime.enabled
     core.shutdown()
     assert core.hud_runtime is None
+
+
+def test_voice_startup_failure_isolated_from_core(tmp_path, monkeypatch) -> None:
+    class FailingVoiceRuntime:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("audio unavailable")
+
+    monkeypatch.setattr("app.audio.runtime.VoiceRuntime", FailingVoiceRuntime)
+    settings = Settings(data_dir=tmp_path, memory_enabled=False, voice=AudioConfig(enabled=True))
+    core = JarvisCore(settings)
+
+    core.start()
+
+    assert core.is_running
+    assert core.voice_runtime is None
+    core.shutdown()
