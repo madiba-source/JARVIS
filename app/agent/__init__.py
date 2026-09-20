@@ -2,6 +2,7 @@
 
 from .events import AgentEvent, AgentEventType
 from .models import AgentPlan, AgentRequest, AgentResult, AgentSession, AgentStep
+from .autonomy import AutonomyLevel, AutonomousCoordinator, Goal, GoalStatus
 
 
 def __getattr__(name: str):
@@ -13,4 +14,5 @@ def __getattr__(name: str):
 __all__ = [
     "AgentEvent", "AgentEventType", "AgentPlan", "AgentRequest", "AgentResult",
     "AgentRuntime", "AgentSession", "AgentStep",
+    "AutonomyLevel", "AutonomousCoordinator", "Goal", "GoalStatus",
 ]

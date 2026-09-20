@@ -21,6 +21,7 @@ class JarvisCore:
         self._runtime_policy_service = None
         self._started = False
         self.agent_runtime = None
+        self.autonomy_runtime = None
         self.agent_runtime_error: str | None = None
         self.hud_runtime = None
         self.memory_runtime = None
@@ -63,6 +64,7 @@ class JarvisCore:
         self._start_multimodal_runtime()
         self._start_interaction_runtime()
         self._start_agent_runtime()
+        self._start_autonomy_runtime()
         self._start_hud()
         self._started = True
         self._logger.info("JARVIS ready")
@@ -196,6 +198,17 @@ class JarvisCore:
             self.interaction_runtime = None
             self._logger.exception("JARVIS interaction runtime startup failed")
 
+    def _start_autonomy_runtime(self) -> None:
+        if self.agent_runtime is None:
+            self.autonomy_runtime = None
+            return
+        try:
+            from app.agent.autonomy import AutonomousCoordinator
+            self.autonomy_runtime = AutonomousCoordinator(self.agent_runtime)
+        except Exception:
+            self.autonomy_runtime = None
+            self._logger.exception("JARVIS autonomy runtime startup failed")
+
     def _voice_announce(self, message: str) -> None:
         voice = self.voice_runtime
         if voice is not None and getattr(voice, "_started", False):
@@ -275,5 +288,6 @@ class JarvisCore:
             except Exception:
                 self._logger.exception("JARVIS interaction shutdown failed")
             self.interaction_runtime = None
+        self.autonomy_runtime = None
         self._database = None
         self._started = False
